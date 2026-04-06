@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#16A34A">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link rel="manifest" href="/static/manifest.json">
+    <title>Olive</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#F0FDF4', 100: '#DCFCE7', 200: '#BBF7D0',
+                            300: '#86EFAC', 400: '#4ADE80', 500: '#22C55E',
+                            600: '#16A34A', 700: '#15803D', 800: '#166534',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .tab-active { background: white; color: #16A34A; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .tab-inactive { background: transparent; color: rgba(255,255,255,0.7); }
+        .pill-selected { background: #16A34A; color: white; }
+        .pill-unselected { background: #DCFCE7; color: #15803D; }
+        .toast {
+            animation: slideUp 0.3s ease-out, fadeOut 0.3s ease-in 2s forwards;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            to { opacity: 0; pointer-events: none; }
+        }
+        input[type="datetime-local"] { font-size: 16px; }
+        .quick-amt.selected { background: #16A34A; color: white; }
+        .quick-amt:not(.selected) { background: #DCFCE7; color: #15803D; }
+        .wt-toggle-active { background: #16A34A; color: white; }
+        .wt-toggle-inactive { background: #DCFCE7; color: #15803D; }
+    </style>
+</head>
+<body class="bg-brand-50 min-h-screen">
+
+    <!-- ========== LOGIN SCREEN ========== -->
+    <div id="screen-login" class="hidden min-h-screen flex items-center justify-center px-4">
+        <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm text-center">
+            <div class="text-5xl mb-3">🫒</div>
+            <h1 class="text-3xl font-bold text-brand-700 mb-1">Olive</h1>
+            <p class="text-gray-500 text-sm mb-6">Baby Tracker</p>
+
+            <div id="login-form">
+                <input type="email" id="login-email" placeholder="Enter your email"
+                    class="w-full border border-gray-200 rounded-lg px-4 py-3 mb-3 focus:outline-none focus:ring-2 focus:ring-brand-400 text-center">
+                <button onclick="sendMagicLink()" id="btn-login"
+                    class="w-full py-3 bg-brand-600 text-white rounded-xl font-semibold hover:bg-brand-700 active:scale-[0.98] transition-all">
+                    Send Magic Link
+                </button>
+            </div>
+
+            <div id="login-sent" class="hidden">
+                <div class="text-4xl mb-3">📧</div>
+                <p class="text-gray-700 font-medium mb-1">Check your email!</p>
+                <p class="text-gray-500 text-sm mb-4">We sent a login link to <strong id="login-sent-email"></strong></p>
+                <button onclick="showLoginForm()"
+                    class="text-sm text-brand-600 font-medium hover:underline">Try a different email</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== ONBOARDING SCREEN ========== -->
+    <div id="screen-onboarding" class="hidden min-h-screen flex items-center justify-center px-4">
+        <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm text-center">
+            <div class="text-5xl mb-3">👶</div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Welcome to Olive!</h2>
+            <p class="text-gray-500 text-sm mb-6">What's your baby's name?</p>
+
+            <input type="text" id="onboard-name" placeholder="Baby's name"
+                class="w-full border border-gray-200 rounded-lg px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-brand-400 text-center text-lg">
+
+            <p class="text-gray-500 text-sm mb-4">And what's your name?</p>
+            <input type="text" id="onboard-user-name" placeholder="Your name"
+                class="w-full border border-gray-200 rounded-lg px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-brand-400 text-center">
+
+            <button onclick="createBaby()" id="btn-onboard"
+                class="w-full py-3 bg-brand-600 text-white rounded-xl font-semibold hover:bg-brand-700 active:scale-[0.98] transition-all">
+                Get Started
+            </button>
+        </div>
+    </div>
+
+    <!-- ========== MAIN APP ========== -->
+    <div id="screen-app" class="hidden pb-4">
+
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-brand-600 to-brand-700 text-white pt-10 pb-3 px-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🫒</span>
+                    <h1 class="text-2xl font-bold tracking-tight">Olive</h1>
+                </div>
+                <div class="flex items-center gap-2">
+                    <select id="baby-selector" onchange="switchBaby(this.value)"
+                        class="bg-white/20 text-white text-sm rounded-lg px-2 py-1 border-0 outline-none hidden">
+                    </select>
+                    <span id="baby-name-display" class="text-sm font-medium opacity-80"></span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Daily Summary -->
+        <div id="summary" class="bg-white mx-4 -mt-1 rounded-b-xl shadow-sm p-4 mb-3">
+            <div class="grid grid-cols-5 text-center text-sm gap-1">
+                <div>
+                    <div class="text-xl font-bold text-brand-600" id="sum-feeds">--</div>
+                    <div class="text-gray-500 text-xs">feeds</div>
+                </div>
+                <div>
+                    <div class="text-xl font-bold text-brand-600" id="sum-oz">--</div>
+                    <div class="text-gray-500 text-xs">oz today</div>
+                </div>
+                <div>
+                    <div class="text-xl font-bold text-brand-600" id="sum-poops">--</div>
+                    <div class="text-gray-500 text-xs">poops</div>
+                </div>
+                <div>
+                    <div class="text-xl font-bold text-brand-600" id="sum-sleep">--</div>
+                    <div class="text-gray-500 text-xs">hrs sleep</div>
+                </div>
+                <div>
+                    <div class="text-xl font-bold text-brand-600" id="sum-weight">--</div>
+                    <div class="text-gray-500 text-xs">lbs</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="mx-4 mb-4">
+            <div class="bg-brand-200 rounded-xl p-1.5 flex gap-1">
+                <button onclick="switchTab('feed')" id="tab-feed"
+                    class="flex-1 py-3 rounded-lg font-semibold transition-all tab-active flex flex-col items-center gap-0.5">
+                    <span class="text-2xl leading-none">🍼</span><span class="text-xs">Feed</span>
+                </button>
+                <button onclick="switchTab('poop')" id="tab-poop"
+                    class="flex-1 py-3 rounded-lg font-semibold transition-all tab-inactive flex flex-col items-center gap-0.5">
+                    <span class="text-2xl leading-none">💩</span><span class="text-xs">Poop</span>
+                </button>
+                <button onclick="switchTab('sleep')" id="tab-sleep"
+                    class="flex-1 py-3 rounded-lg font-semibold transition-all tab-inactive flex flex-col items-center gap-0.5">
+                    <span class="text-2xl leading-none">😴</span><span class="text-xs">Sleep</span>
+                </button>
+                <button onclick="switchTab('weight')" id="tab-weight"
+                    class="flex-1 py-3 rounded-lg font-semibold transition-all tab-inactive flex flex-col items-center gap-0.5">
+                    <span class="text-2xl leading-none">⚖️</span><span class="text-xs">Weight</span>
+                </button>
+                <button onclick="switchTab('settings')" id="tab-settings"
+                    class="flex-1 py-3 rounded-lg font-semibold transition-all tab-inactive flex flex-col items-center gap-0.5">
+                    <span class="text-2xl leading-none">⚙️</span><span class="text-xs">Settings</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Feed Form -->
+        <div id="panel-feed" class="px-4">
+            <div class="bg-white rounded-xl shadow-sm p-4 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Date & Time</label>
+                    <input type="datetime-local" id="feed-dt"
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-2">Milk Type</label>
+                    <div class="flex gap-2">
+                        <button onclick="selectMilk('Breast Milk')" id="milk-bm"
+                            class="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all pill-selected">
+                            Breast Milk
+                        </button>
+                        <button onclick="selectMilk('Formula')" id="milk-formula"
+                            class="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all pill-unselected">
+                            Formula
+                        </button>
+                        <button onclick="selectMilk('Mix')" id="milk-mix"
+                            class="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all pill-unselected">
+                            Mix
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-2">Amount (oz)</label>
+                    <div class="mb-2">
+                        <input type="text" id="feed-oz" value="2.0"
+                            inputmode="decimal" pattern="[0-9]*\.?[0-9]*"
+                            class="w-full text-center text-2xl font-bold border border-gray-200 rounded-lg py-2 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                    </div>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button onclick="setOz(0.5)" class="quick-amt py-2 rounded-lg text-sm font-semibold transition-all">0.5</button>
+                        <button onclick="setOz(1)" class="quick-amt py-2 rounded-lg text-sm font-semibold transition-all">1</button>
+                        <button onclick="setOz(1.5)" class="quick-amt py-2 rounded-lg text-sm font-semibold transition-all">1.5</button>
+                        <button onclick="setOz(2)" class="quick-amt selected py-2 rounded-lg text-sm font-semibold transition-all">2</button>
+                        <button onclick="setOz(2.5)" class="quick-amt py-2 rounded-lg text-sm font-semibold transition-all">2.5</button>
+                        <button onclick="setOz(3)" class="quick-amt py-2 rounded-lg text-sm font-semibold transition-all">3</button>
+                        <button onclick="setOz(3.5)" class="quick-amt py-2 rounded-lg text-sm font-semibold transition-all">3.5</button>
+                        <button onclick="setOz(4)" class="quick-amt py-2 rounded-lg text-sm font-semibold transition-all">4</button>
+                    </div>
+                </div>
+
+                <button onclick="submitFeeding()" id="btn-feed"
+                    class="w-full py-3 bg-brand-600 text-white rounded-xl font-semibold text-base hover:bg-brand-700 active:scale-[0.98] transition-all">
+                    Log Feeding
+                </button>
+            </div>
+
+            <div class="mt-4">
+                <h3 class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2 px-1">All Feedings</h3>
+                <div id="list-feedings" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- Poop Form -->
+        <div id="panel-poop" class="px-4 hidden">
+            <div class="bg-white rounded-xl shadow-sm p-4 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Date & Time</label>
+                    <input type="datetime-local" id="poop-dt"
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-2">Type</label>
+                    <div class="flex flex-wrap gap-2" id="poop-types">
+                        <button onclick="selectPoopType('Normal')"
+                            class="poop-pill px-4 py-2 rounded-lg text-sm font-semibold transition-all pill-selected">Normal</button>
+                        <button onclick="selectPoopType('Seedy')"
+                            class="poop-pill px-4 py-2 rounded-lg text-sm font-semibold transition-all pill-unselected">Seedy</button>
+                        <button onclick="selectPoopType('Watery')"
+                            class="poop-pill px-4 py-2 rounded-lg text-sm font-semibold transition-all pill-unselected">Watery</button>
+                        <button onclick="selectPoopType('Mucousy')"
+                            class="poop-pill px-4 py-2 rounded-lg text-sm font-semibold transition-all pill-unselected">Mucousy</button>
+                        <button onclick="selectPoopType('Hard')"
+                            class="poop-pill px-4 py-2 rounded-lg text-sm font-semibold transition-all pill-unselected">Hard</button>
+                        <button onclick="selectPoopType('Meconium')"
+                            class="poop-pill px-4 py-2 rounded-lg text-sm font-semibold transition-all pill-unselected">Meconium</button>
+                        <button onclick="selectPoopType('Diarrhea')"
+                            class="poop-pill px-4 py-2 rounded-lg text-sm font-semibold transition-all pill-unselected">Diarrhea</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Notes (optional)</label>
+                    <input type="text" id="poop-notes" placeholder="Any additional notes..."
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                </div>
+
+                <button onclick="submitPoop()" id="btn-poop"
+                    class="w-full py-3 bg-brand-600 text-white rounded-xl font-semibold text-base hover:bg-brand-700 active:scale-[0.98] transition-all">
+                    Log Poop
+                </button>
+            </div>
+
+            <div class="mt-4">
+                <h3 class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2 px-1">All Poops</h3>
+                <div id="list-poops" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- Sleep Panel -->
+        <div id="panel-sleep" class="px-4 hidden">
+            <div id="sleep-timer-mode" class="bg-white rounded-xl shadow-sm p-4 space-y-4">
+                <div id="sleep-timer-idle">
+                    <p class="text-center text-sm text-gray-500 mb-3">Tap when baby falls asleep</p>
+                    <button onclick="startSleepTimer()"
+                        class="w-full py-4 bg-brand-600 text-white rounded-xl font-semibold text-lg hover:bg-brand-700 active:scale-[0.98] transition-all">
+                        Start Sleep
+                    </button>
+                </div>
+
+                <div id="sleep-timer-running" class="hidden">
+                    <p class="text-center text-xs text-gray-500 mb-1">Sleeping since</p>
+                    <p class="text-center text-lg font-bold text-brand-600 mb-1" id="sleep-started-at"></p>
+                    <p class="text-center text-3xl font-bold text-gray-800 mb-4" id="sleep-elapsed">0:00:00</p>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Notes (optional)</label>
+                        <input type="text" id="sleep-timer-notes" placeholder="Nap, nighttime, fussy, etc."
+                            class="w-full border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                    </div>
+                    <button onclick="stopSleepTimer()"
+                        class="w-full mt-3 py-4 bg-red-500 text-white rounded-xl font-semibold text-lg hover:bg-red-600 active:scale-[0.98] transition-all">
+                        End Sleep
+                    </button>
+                </div>
+
+                <button onclick="showManualSleep()"
+                    class="w-full py-2 text-sm text-brand-600 font-medium hover:underline">
+                    Manual Entry
+                </button>
+            </div>
+
+            <div id="sleep-manual-mode" class="bg-white rounded-xl shadow-sm p-4 space-y-4 hidden">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Fell Asleep</label>
+                    <input type="datetime-local" id="sleep-start"
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Woke Up</label>
+                    <input type="datetime-local" id="sleep-end"
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Notes (optional)</label>
+                    <input type="text" id="sleep-notes" placeholder="Nap, nighttime, fussy, etc."
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                </div>
+                <button onclick="submitSleep()" id="btn-sleep"
+                    class="w-full py-3 bg-brand-600 text-white rounded-xl font-semibold text-base hover:bg-brand-700 active:scale-[0.98] transition-all">
+                    Log Sleep
+                </button>
+                <button onclick="showTimerSleep()"
+                    class="w-full py-2 text-sm text-brand-600 font-medium hover:underline">
+                    Back to Timer
+                </button>
+            </div>
+
+            <div class="mt-4">
+                <h3 class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2 px-1">All Sleep</h3>
+                <div id="list-sleep" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- Weight Form -->
+        <div id="panel-weight" class="px-4 hidden">
+            <div class="bg-white rounded-xl shadow-sm p-4 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Date & Time</label>
+                    <input type="datetime-local" id="weight-dt"
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                </div>
+
+                <!-- Weight Mode Toggle -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-2">Input Mode</label>
+                    <div class="flex gap-2">
+                        <button onclick="setWeightMode('lbs_oz')" id="wt-mode-lbs_oz"
+                            class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all wt-toggle-active">
+                            lbs + oz
+                        </button>
+                        <button onclick="setWeightMode('decimal')" id="wt-mode-decimal"
+                            class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all wt-toggle-inactive">
+                            Decimal lbs
+                        </button>
+                    </div>
+                </div>
+
+                <!-- lbs + oz input -->
+                <div id="weight-lbs-oz-input" class="flex gap-4">
+                    <div class="flex-1">
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Pounds</label>
+                        <input type="text" id="weight-lbs" value="7"
+                            inputmode="numeric" pattern="[0-9]*"
+                            class="w-full text-center text-2xl font-bold border border-gray-200 rounded-lg py-2 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                    </div>
+                    <div class="flex items-end pb-3 text-gray-400 font-bold text-xl">:</div>
+                    <div class="flex-1">
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Ounces</label>
+                        <input type="text" id="weight-ozs" value="0"
+                            inputmode="decimal" pattern="[0-9]*\.?[0-9]*"
+                            class="w-full text-center text-2xl font-bold border border-gray-200 rounded-lg py-2 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                    </div>
+                </div>
+
+                <!-- Decimal input -->
+                <div id="weight-decimal-input" class="hidden">
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Weight (lbs)</label>
+                    <input type="text" id="weight-decimal" value="7.00"
+                        inputmode="decimal" pattern="[0-9]*\.?[0-9]*"
+                        class="w-full text-center text-2xl font-bold border border-gray-200 rounded-lg py-2 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                </div>
+
+                <button onclick="submitWeight()" id="btn-weight"
+                    class="w-full py-3 bg-brand-600 text-white rounded-xl font-semibold text-base hover:bg-brand-700 active:scale-[0.98] transition-all">
+                    Log Weight
+                </button>
+            </div>
+
+            <div class="mt-4">
+                <h3 class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2 px-1">Weight History</h3>
+                <div id="list-weight" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div id="panel-settings" class="px-4 hidden">
+            <div class="bg-white rounded-xl shadow-sm p-4 space-y-5">
+                <h3 class="text-lg font-bold text-gray-800">Settings</h3>
+
+                <!-- Baby info -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Baby</label>
+                    <p class="text-gray-800 font-medium" id="settings-baby-name"></p>
+                </div>
+
+                <!-- Caregivers -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-2">Caregivers</label>
+                    <div id="caregiver-list" class="space-y-2 mb-3"></div>
+                </div>
+
+                <!-- Invite -->
+                <div id="invite-section">
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Invite a Caregiver</label>
+                    <div class="flex gap-2">
+                        <input type="email" id="invite-email" placeholder="Email address"
+                            class="flex-1 border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                        <button onclick="sendInvite()" id="btn-invite"
+                            class="px-4 py-2.5 bg-brand-600 text-white rounded-lg font-semibold text-sm hover:bg-brand-700 active:scale-[0.98] transition-all">
+                            Invite
+                        </button>
+                    </div>
+                </div>
+
+                <hr class="border-gray-100">
+
+                <!-- Account -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Logged in as</label>
+                    <p class="text-gray-800 text-sm" id="settings-email"></p>
+                </div>
+
+                <button onclick="doLogout()"
+                    class="w-full py-3 border border-red-200 text-red-600 rounded-xl font-semibold text-base hover:bg-red-50 active:scale-[0.98] transition-all">
+                    Log Out
+                </button>
+            </div>
+        </div>
+
+    </div><!-- end screen-app -->
+
+    <!-- Toast container -->
+    <div id="toast-container" class="fixed bottom-6 left-4 right-4 flex flex-col items-center gap-2 pointer-events-none z-50"></div>
+
+    <script>
+        // --- State ---
+        let currentUser = null;
+        let babies = [];
+        let activeBabyId = null;
+        let selectedMilk = 'Breast Milk';
+        let selectedPoopType = 'Normal';
+        let currentTab = 'feed';
+        let weightMode = localStorage.getItem('olive_weight_mode') || 'lbs_oz';
+        const allTabs = ['feed', 'poop', 'sleep', 'weight', 'settings'];
+        let sleepTimerInterval = null;
+        let sleepStartTime = null;
+
+        // --- Boot ---
+        async function boot() {
+            try {
+                const res = await fetch('/api/auth/me');
+                if (!res.ok) { showScreen('login'); return; }
+                const data = await res.json();
+                currentUser = data.user;
+                babies = data.babies;
+
+                if (babies.length === 0) {
+                    showScreen('onboarding');
+                    return;
+                }
+
+                // Restore or pick active baby
+                const saved = localStorage.getItem('olive_active_baby');
+                if (saved && babies.find(b => b.id === saved)) {
+                    activeBabyId = saved;
+                } else {
+                    activeBabyId = babies[0].id;
+                    localStorage.setItem('olive_active_baby', activeBabyId);
+                }
+
+                setupApp();
+                showScreen('app');
+            } catch {
+                showScreen('login');
+            }
+        }
+
+        function showScreen(name) {
+            ['login', 'onboarding', 'app'].forEach(s => {
+                document.getElementById(`screen-${s}`).classList.toggle('hidden', s !== name);
+            });
+        }
+
+        function setupApp() {
+            // Baby selector
+            const selector = document.getElementById('baby-selector');
+            const nameDisplay = document.getElementById('baby-name-display');
+            if (babies.length > 1) {
+                selector.innerHTML = babies.map(b =>
+                    `<option value="${b.id}" ${b.id === activeBabyId ? 'selected' : ''}>${b.name}</option>`
+                ).join('');
+                selector.classList.remove('hidden');
+                nameDisplay.classList.add('hidden');
+            } else {
+                selector.classList.add('hidden');
+                nameDisplay.textContent = babies[0].name;
+                nameDisplay.classList.remove('hidden');
+            }
+
+            // Init forms
+            setNow('feed-dt');
+            setNow('poop-dt');
+            setNow('weight-dt');
+            setSleepDefaults();
+            restoreSleepTimer();
+            setWeightMode(weightMode);
+            loadSummary();
+            loadEntries('feed');
+        }
+
+        function switchBaby(id) {
+            activeBabyId = id;
+            localStorage.setItem('olive_active_baby', id);
+            loadSummary();
+            loadEntries(currentTab);
+        }
+
+        // --- Auth Actions ---
+        async function sendMagicLink() {
+            const email = document.getElementById('login-email').value.trim();
+            if (!email) return;
+            const btn = document.getElementById('btn-login');
+            btn.disabled = true; btn.textContent = 'Sending...';
+            try {
+                await apiPost('/api/auth/login', { email });
+                document.getElementById('login-sent-email').textContent = email;
+                document.getElementById('login-form').classList.add('hidden');
+                document.getElementById('login-sent').classList.remove('hidden');
+            } catch (e) {
+                showToast(e.message, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = 'Send Magic Link';
+            }
+        }
+
+        function showLoginForm() {
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('login-sent').classList.add('hidden');
+        }
+
+        async function createBaby() {
+            const babyName = document.getElementById('onboard-name').value.trim();
+            const userName = document.getElementById('onboard-user-name').value.trim();
+            if (!babyName) { showToast('Please enter baby name', 'error'); return; }
+            const btn = document.getElementById('btn-onboard');
+            btn.disabled = true; btn.textContent = 'Creating...';
+            try {
+                if (userName) {
+                    await apiPost('/api/auth/update-name', { name: userName });
+                }
+                const baby = await apiPost('/api/babies', { name: babyName });
+                activeBabyId = baby.id;
+                localStorage.setItem('olive_active_baby', baby.id);
+                babies = [baby];
+                setupApp();
+                showScreen('app');
+            } catch (e) {
+                showToast(e.message, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = 'Get Started';
+            }
+        }
+
+        async function doLogout() {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            localStorage.removeItem('olive_active_baby');
+            currentUser = null;
+            babies = [];
+            activeBabyId = null;
+            showScreen('login');
+        }
+
+        // --- Helpers ---
+        function setNow(inputId) {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById(inputId).value = now.toISOString().slice(0, 16);
+        }
+
+        function setSleepDefaults() {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('sleep-end').value = now.toISOString().slice(0, 16);
+            const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+            document.getElementById('sleep-start').value = hourAgo.toISOString().slice(0, 16);
+        }
+
+        function apiBase() {
+            return `/api/babies/${activeBabyId}`;
+        }
+
+        // --- Tabs ---
+        function switchTab(tab) {
+            currentTab = tab;
+            allTabs.forEach(t => {
+                const panel = document.getElementById(`panel-${t}`);
+                if (panel) panel.classList.toggle('hidden', t !== tab);
+                const btn = document.getElementById(`tab-${t}`);
+                if (btn) btn.className = `flex-1 py-3 rounded-lg font-semibold transition-all flex flex-col items-center gap-0.5 ${t === tab ? 'tab-active' : 'tab-inactive'}`;
+            });
+            if (tab === 'sleep') {
+                setSleepDefaults();
+            } else if (tab === 'settings') {
+                loadSettings();
+            } else {
+                const dtId = tab === 'feed' ? 'feed-dt' : tab === 'poop' ? 'poop-dt' : 'weight-dt';
+                setNow(dtId);
+            }
+            if (['feed', 'poop', 'sleep', 'weight'].includes(tab)) {
+                loadEntries(tab);
+            }
+        }
+
+        // --- Milk Type ---
+        function selectMilk(type) {
+            selectedMilk = type;
+            const map = { 'Breast Milk': 'milk-bm', 'Formula': 'milk-formula', 'Mix': 'milk-mix' };
+            Object.entries(map).forEach(([k, id]) => {
+                document.getElementById(id).className =
+                    `flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${k === type ? 'pill-selected' : 'pill-unselected'}`;
+            });
+        }
+
+        // --- Oz controls ---
+        function setOz(val) {
+            document.getElementById('feed-oz').value = val.toFixed(1);
+            highlightQuickAmt(val);
+        }
+
+        function highlightQuickAmt(val) {
+            document.querySelectorAll('.quick-amt').forEach(btn => {
+                const match = parseFloat(btn.textContent) === val;
+                btn.classList.toggle('selected', match);
+            });
+        }
+
+        // --- Poop Type ---
+        function selectPoopType(type) {
+            selectedPoopType = type;
+            document.querySelectorAll('.poop-pill').forEach(btn => {
+                const match = btn.textContent.trim() === type;
+                btn.className = `poop-pill px-4 py-2 rounded-lg text-sm font-semibold transition-all ${match ? 'pill-selected' : 'pill-unselected'}`;
+            });
+        }
+
+        // --- Weight Mode ---
+        function setWeightMode(mode) {
+            weightMode = mode;
+            localStorage.setItem('olive_weight_mode', mode);
+            document.getElementById('weight-lbs-oz-input').classList.toggle('hidden', mode !== 'lbs_oz');
+            document.getElementById('weight-decimal-input').classList.toggle('hidden', mode !== 'decimal');
+            document.getElementById('wt-mode-lbs_oz').className =
+                `flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${mode === 'lbs_oz' ? 'wt-toggle-active' : 'wt-toggle-inactive'}`;
+            document.getElementById('wt-mode-decimal').className =
+                `flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${mode === 'decimal' ? 'wt-toggle-active' : 'wt-toggle-inactive'}`;
+        }
+
+        // --- API Calls ---
+        async function apiPost(url, body) {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+                if (res.status === 401) { showScreen('login'); throw new Error('Session expired'); }
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || 'Request failed');
+            }
+            return res.json();
+        }
+
+        async function apiPut(url, body) {
+            const res = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+                if (res.status === 401) { showScreen('login'); throw new Error('Session expired'); }
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || 'Request failed');
+            }
+            return res.json();
+        }
+
+        async function apiDelete(url) {
+            const res = await fetch(url, { method: 'DELETE' });
+            if (!res.ok) {
+                if (res.status === 401) { showScreen('login'); throw new Error('Session expired'); }
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || 'Request failed');
+            }
+            return res.json();
+        }
+
+        // --- Submit Handlers ---
+        async function submitFeeding() {
+            const btn = document.getElementById('btn-feed');
+            btn.disabled = true; btn.textContent = 'Saving...';
+            try {
+                await apiPost(`${apiBase()}/feedings`, {
+                    datetime: document.getElementById('feed-dt').value,
+                    milk_type: selectedMilk,
+                    amount_oz: parseFloat(document.getElementById('feed-oz').value),
+                });
+                showToast('Feeding logged!', 'success');
+                setNow('feed-dt');
+                loadEntries('feed');
+                loadSummary();
+            } catch (e) { showToast(e.message, 'error'); }
+            finally { btn.disabled = false; btn.textContent = 'Log Feeding'; }
+        }
+
+        async function submitPoop() {
+            const btn = document.getElementById('btn-poop');
+            btn.disabled = true; btn.textContent = 'Saving...';
+            try {
+                await apiPost(`${apiBase()}/poops`, {
+                    datetime: document.getElementById('poop-dt').value,
+                    poop_type: selectedPoopType,
+                    notes: document.getElementById('poop-notes').value,
+                });
+                showToast('Poop logged!', 'success');
+                document.getElementById('poop-notes').value = '';
+                setNow('poop-dt');
+                loadEntries('poop');
+                loadSummary();
+            } catch (e) { showToast(e.message, 'error'); }
+            finally { btn.disabled = false; btn.textContent = 'Log Poop'; }
+        }
+
+        async function submitSleep() {
+            const btn = document.getElementById('btn-sleep');
+            btn.disabled = true; btn.textContent = 'Saving...';
+            try {
+                await apiPost(`${apiBase()}/sleep`, {
+                    start_time: document.getElementById('sleep-start').value,
+                    end_time: document.getElementById('sleep-end').value,
+                    notes: document.getElementById('sleep-notes').value,
+                });
+                showToast('Sleep logged!', 'success');
+                document.getElementById('sleep-notes').value = '';
+                setSleepDefaults();
+                loadEntries('sleep');
+                loadSummary();
+            } catch (e) { showToast(e.message, 'error'); }
+            finally { btn.disabled = false; btn.textContent = 'Log Sleep'; }
+        }
+
+        async function submitWeight() {
+            const btn = document.getElementById('btn-weight');
+            btn.disabled = true; btn.textContent = 'Saving...';
+            try {
+                const body = { datetime: document.getElementById('weight-dt').value, input_mode: weightMode };
+                if (weightMode === 'decimal') {
+                    body.decimal_lbs = parseFloat(document.getElementById('weight-decimal').value);
+                } else {
+                    body.pounds = parseInt(document.getElementById('weight-lbs').value);
+                    body.ounces = parseFloat(document.getElementById('weight-ozs').value);
+                }
+                await apiPost(`${apiBase()}/weight`, body);
+                showToast('Weight logged!', 'success');
+                setNow('weight-dt');
+                loadEntries('weight');
+                loadSummary();
+            } catch (e) { showToast(e.message, 'error'); }
+            finally { btn.disabled = false; btn.textContent = 'Log Weight'; }
+        }
+
+        // --- Sleep Timer ---
+        function showManualSleep() {
+            document.getElementById('sleep-timer-mode').classList.add('hidden');
+            document.getElementById('sleep-manual-mode').classList.remove('hidden');
+            setSleepDefaults();
+        }
+        function showTimerSleep() {
+            document.getElementById('sleep-manual-mode').classList.add('hidden');
+            document.getElementById('sleep-timer-mode').classList.remove('hidden');
+        }
+
+        function startSleepTimer() {
+            sleepStartTime = new Date();
+            localStorage.setItem('olive_sleep_start', sleepStartTime.toISOString());
+            showRunningTimer();
+        }
+
+        function showRunningTimer() {
+            document.getElementById('sleep-timer-idle').classList.add('hidden');
+            document.getElementById('sleep-timer-running').classList.remove('hidden');
+            document.getElementById('sleep-started-at').textContent =
+                sleepStartTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            updateElapsed();
+            sleepTimerInterval = setInterval(updateElapsed, 1000);
+        }
+
+        function updateElapsed() {
+            const diff = Math.floor((Date.now() - sleepStartTime.getTime()) / 1000);
+            const h = Math.floor(diff / 3600);
+            const m = Math.floor((diff % 3600) / 60);
+            const s = diff % 60;
+            document.getElementById('sleep-elapsed').textContent =
+                `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+
+        function restoreSleepTimer() {
+            const saved = localStorage.getItem('olive_sleep_start');
+            if (saved) {
+                sleepStartTime = new Date(saved);
+                if (!isNaN(sleepStartTime.getTime())) {
+                    showRunningTimer();
+                } else {
+                    localStorage.removeItem('olive_sleep_start');
+                }
+            }
+        }
+
+        async function stopSleepTimer() {
+            clearInterval(sleepTimerInterval);
+            const endTime = new Date();
+            const notes = document.getElementById('sleep-timer-notes').value;
+            const toLocal = (d) => {
+                const offset = d.getTimezoneOffset();
+                const local = new Date(d.getTime() - offset * 60000);
+                return local.toISOString().slice(0, 16);
+            };
+            try {
+                await apiPost(`${apiBase()}/sleep`, {
+                    start_time: toLocal(sleepStartTime),
+                    end_time: toLocal(endTime),
+                    notes: notes,
+                });
+                showToast('Sleep logged!', 'success');
+                loadEntries('sleep');
+                loadSummary();
+            } catch (e) { showToast(e.message, 'error'); }
+            localStorage.removeItem('olive_sleep_start');
+            sleepStartTime = null;
+            document.getElementById('sleep-timer-notes').value = '';
+            document.getElementById('sleep-timer-running').classList.add('hidden');
+            document.getElementById('sleep-timer-idle').classList.remove('hidden');
+        }
+
+        // --- Delete & Edit ---
+        async function deleteEntry(type, id) {
+            if (!confirm('Delete this entry?')) return;
+            try {
+                await apiDelete(`${apiBase()}/${type}/${id}`);
+                showToast('Deleted', 'success');
+                loadEntries(currentTab);
+                loadSummary();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        function editEntry(type, id, data) {
+            let fields;
+            if (type === 'feedings') {
+                fields = [
+                    { key: 'date', label: 'Date', value: data.date },
+                    { key: 'time', label: 'Time', value: data.time },
+                    { key: 'milk_type', label: 'Milk Type', value: data.milk_type },
+                    { key: 'amount_oz', label: 'Amount (oz)', value: data.amount_oz },
+                ];
+            } else if (type === 'poops') {
+                fields = [
+                    { key: 'date', label: 'Date', value: data.date },
+                    { key: 'time', label: 'Time', value: data.time },
+                    { key: 'poop_type', label: 'Type', value: data.poop_type },
+                    { key: 'notes', label: 'Notes', value: data.notes },
+                ];
+            } else if (type === 'sleep') {
+                fields = [
+                    { key: 'start_date', label: 'Start Date', value: data.start_date },
+                    { key: 'start_time', label: 'Start Time', value: data.start_time },
+                    { key: 'end_date', label: 'End Date', value: data.end_date },
+                    { key: 'end_time', label: 'End Time', value: data.end_time },
+                    { key: 'notes', label: 'Notes', value: data.notes },
+                ];
+            } else {
+                fields = [
+                    { key: 'date', label: 'Date', value: data.date },
+                    { key: 'time', label: 'Time', value: data.time },
+                    { key: 'pounds', label: 'Pounds', value: data.pounds },
+                    { key: 'ounces', label: 'Ounces', value: data.ounces },
+                ];
+            }
+
+            const fieldInputs = fields.map(f =>
+                `<div class="flex items-center gap-2">
+                    <label class="text-xs text-gray-500 w-24 shrink-0">${f.label}</label>
+                    <input type="text" value="${f.value}" data-key="${f.key}"
+                        class="flex-1 border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400">
+                </div>`
+            ).join('');
+
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl w-full max-w-md p-5 space-y-3 max-h-[80vh] overflow-y-auto">
+                    <h3 class="text-lg font-bold text-gray-800">Edit Entry</h3>
+                    <div class="space-y-2" id="edit-fields">${fieldInputs}</div>
+                    <div class="flex gap-2 pt-2">
+                        <button onclick="this.closest('.fixed').remove()"
+                            class="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600">Cancel</button>
+                        <button onclick="saveEdit('${type}', '${id}', this)"
+                            class="flex-1 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold">Save</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+            modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+        }
+
+        async function saveEdit(type, id, btn) {
+            const modal = btn.closest('.fixed');
+            const inputs = modal.querySelectorAll('#edit-fields input');
+            const vals = {};
+            inputs.forEach(i => vals[i.dataset.key] = i.value);
+
+            try {
+                let body;
+                if (type === 'feedings') {
+                    body = { datetime: parseDateTimeFields(vals.date, vals.time), milk_type: vals.milk_type, amount_oz: parseFloat(vals.amount_oz) };
+                } else if (type === 'poops') {
+                    body = { datetime: parseDateTimeFields(vals.date, vals.time), poop_type: vals.poop_type, notes: vals.notes };
+                } else if (type === 'sleep') {
+                    body = { start_time: parseDateTimeFields(vals.start_date, vals.start_time), end_time: parseDateTimeFields(vals.end_date, vals.end_time), notes: vals.notes };
+                } else {
+                    body = { datetime: parseDateTimeFields(vals.date, vals.time), input_mode: 'lbs_oz', pounds: parseInt(vals.pounds), ounces: parseFloat(vals.ounces) };
+                }
+                await apiPut(`${apiBase()}/${type}/${id}`, body);
+                showToast('Updated', 'success');
+                modal.remove();
+                loadEntries(currentTab);
+                loadSummary();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        function parseDateTimeFields(dateStr, timeStr) {
+            // Parse "MM/DD/YYYY" + "HH:MM AM/PM" into "YYYY-MM-DDTHH:MM"
+            const [month, day, year] = dateStr.split('/');
+            const [timePart, ampm] = timeStr.split(' ');
+            let [hours, minutes] = timePart.split(':').map(Number);
+            if (ampm && ampm.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+            if (ampm && ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+            return `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}T${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}`;
+        }
+
+        // --- Action buttons ---
+        function actionBtns(type, id, data) {
+            const encoded = btoa(JSON.stringify(data));
+            return `
+                <div class="flex gap-1 ml-2 shrink-0">
+                    <button onclick="editEntry('${type}', '${id}', JSON.parse(atob('${encoded}')))"
+                        class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-100 text-gray-400 hover:text-brand-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    </button>
+                    <button onclick="deleteEntry('${type}', '${id}')"
+                        class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-100 text-gray-400 hover:text-red-500">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                </div>`;
+        }
+
+        // --- LocalStorage helpers (baby-scoped) ---
+        function cacheKey(key) { return `olive_${activeBabyId}_${key}`; }
+        function cacheSet(key, data) { try { localStorage.setItem(cacheKey(key), JSON.stringify(data)); } catch {} }
+        function cacheGet(key) { try { const d = localStorage.getItem(cacheKey(key)); return d ? JSON.parse(d) : null; } catch { return null; } }
+
+        // --- Render entries ---
+        function renderEntries(tab, data, container) {
+            if (!data || !data.length) { container.innerHTML = '<p class="text-sm text-gray-400 px-1">No entries yet</p>'; return; }
+
+            if (tab === 'feed') {
+                container.innerHTML = data.map(r => `
+                    <div class="bg-white rounded-lg px-3 py-3 shadow-sm flex items-center">
+                        <div class="flex-1 min-w-0">
+                            <span class="text-sm font-medium text-gray-800">${r.milk_type}</span>
+                            <span class="text-xs text-gray-400 ml-2">${r.date} ${r.time}</span>
+                        </div>
+                        <span class="text-lg font-bold text-brand-600 mr-1">${r.amount_oz} oz</span>
+                        ${actionBtns('feedings', r.id, r)}
+                    </div>
+                `).join('');
+            } else if (tab === 'poop') {
+                container.innerHTML = data.map(r => `
+                    <div class="bg-white rounded-lg px-3 py-3 shadow-sm flex items-center">
+                        <div class="flex-1 min-w-0">
+                            <div>
+                                <span class="text-sm font-medium text-gray-800">${r.poop_type}</span>
+                                <span class="text-xs text-gray-400 ml-2">${r.date} ${r.time}</span>
+                            </div>
+                            ${r.notes ? `<p class="text-xs text-gray-500 mt-0.5">${r.notes}</p>` : ''}
+                        </div>
+                        ${actionBtns('poops', r.id, r)}
+                    </div>
+                `).join('');
+            } else if (tab === 'sleep') {
+                container.innerHTML = data.map(r => {
+                    const sameDay = r.start_date === r.end_date;
+                    return `
+                    <div class="bg-white rounded-lg px-3 py-3 shadow-sm flex items-center">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-medium text-gray-800">${r.start_time} - ${r.end_time}</span>
+                                <span class="text-sm font-bold text-brand-600">${r.duration_hrs} hrs</span>
+                            </div>
+                            <div class="flex items-center gap-2 mt-0.5">
+                                <span class="text-xs text-gray-400">${sameDay ? r.start_date : r.start_date + ' - ' + r.end_date}</span>
+                                ${r.notes ? `<span class="text-xs text-gray-500">${r.notes}</span>` : ''}
+                            </div>
+                        </div>
+                        ${actionBtns('sleep', r.id, r)}
+                    </div>`;
+                }).join('');
+            } else {
+                container.innerHTML = data.map(r => `
+                    <div class="bg-white rounded-lg px-3 py-3 shadow-sm flex items-center">
+                        <div class="flex-1 min-w-0">
+                            <span class="text-xs text-gray-400">${r.date} ${r.time}</span>
+                        </div>
+                        <span class="text-lg font-bold text-brand-600 mr-1">${r.pounds} lbs ${r.ounces} oz</span>
+                        ${actionBtns('weight', r.id, r)}
+                    </div>
+                `).join('');
+            }
+        }
+
+        // --- Load All Entries ---
+        async function loadEntries(tab) {
+            const endpoints = { feed: 'feedings', poop: 'poops', sleep: 'sleep', weight: 'weight' };
+            const ep = endpoints[tab];
+            if (!ep || !activeBabyId) return;
+            const container = document.getElementById(`list-${ep === 'sleep' ? 'sleep' : ep}`);
+
+            const cached = cacheGet(ep);
+            if (cached) renderEntries(tab, cached, container);
+
+            try {
+                const res = await fetch(`${apiBase()}/${ep}`);
+                if (!res.ok) { if (!cached) container.innerHTML = '<p class="text-sm text-gray-400 px-1">Could not load entries</p>'; return; }
+                const data = await res.json();
+                cacheSet(ep, data);
+                renderEntries(tab, data, container);
+            } catch {
+                if (!cached) container.innerHTML = '<p class="text-sm text-gray-400 px-1">Could not load entries</p>';
+            }
+        }
+
+        // --- Summary ---
+        async function loadSummary() {
+            if (!activeBabyId) return;
+            const cached = cacheGet('summary');
+            if (cached) applySummary(cached);
+
+            try {
+                const tzOffset = new Date().getTimezoneOffset();
+                const res = await fetch(`${apiBase()}/summary?tz_offset=${tzOffset}`);
+                if (!res.ok) return;
+                const d = await res.json();
+                cacheSet('summary', d);
+                applySummary(d);
+            } catch {}
+        }
+
+        function applySummary(d) {
+            document.getElementById('sum-feeds').textContent = d.feedings_count;
+            document.getElementById('sum-oz').textContent = d.feedings_total_oz;
+            document.getElementById('sum-poops').textContent = d.poops_count;
+            document.getElementById('sum-sleep').textContent = d.sleep_hrs;
+            if (d.latest_weight) {
+                document.getElementById('sum-weight').textContent = d.latest_weight.total_lbs;
+            }
+        }
+
+        // --- Settings ---
+        async function loadSettings() {
+            if (!activeBabyId) return;
+            const baby = babies.find(b => b.id === activeBabyId);
+            document.getElementById('settings-baby-name').textContent = baby ? baby.name : '';
+            document.getElementById('settings-email').textContent = currentUser ? currentUser.email : '';
+
+            // Show invite section only for owners
+            const isOwner = baby && baby.role === 'owner';
+            document.getElementById('invite-section').classList.toggle('hidden', !isOwner);
+
+            try {
+                const res = await fetch(`${apiBase()}/caregivers`);
+                if (!res.ok) return;
+                const caregivers = await res.json();
+                document.getElementById('caregiver-list').innerHTML = caregivers.map(c =>
+                    `<div class="flex items-center justify-between bg-brand-50 rounded-lg px-3 py-2">
+                        <div>
+                            <span class="text-sm font-medium text-gray-800">${c.name || c.email}</span>
+                            ${c.name ? `<span class="text-xs text-gray-400 ml-1">${c.email}</span>` : ''}
+                        </div>
+                        <span class="text-xs px-2 py-0.5 rounded-full ${c.role === 'owner' ? 'bg-brand-200 text-brand-700' : 'bg-gray-200 text-gray-600'}">${c.role}</span>
+                    </div>`
+                ).join('');
+            } catch {}
+        }
+
+        async function sendInvite() {
+            const email = document.getElementById('invite-email').value.trim();
+            if (!email) return;
+            const btn = document.getElementById('btn-invite');
+            btn.disabled = true; btn.textContent = 'Sending...';
+            try {
+                await apiPost(`${apiBase()}/invite`, { email });
+                showToast(`Invite sent to ${email}`, 'success');
+                document.getElementById('invite-email').value = '';
+                loadSettings();
+            } catch (e) { showToast(e.message, 'error'); }
+            finally { btn.disabled = false; btn.textContent = 'Invite'; }
+        }
+
+        // --- Toast ---
+        function showToast(msg, type) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast px-6 py-3 rounded-xl shadow-lg text-white text-sm font-medium pointer-events-auto ${
+                type === 'success' ? 'bg-green-500' : 'bg-red-500'
+            }`;
+            toast.textContent = msg;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 2500);
+        }
+
+        // --- Start ---
+        boot();
+    </script>
+</body>
+</html>
