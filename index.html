@@ -100,7 +100,7 @@
                 </div>
                 <div>
                     <div class="text-xl font-bold text-brand-600" id="sum-weight">--</div>
-                    <div class="text-gray-500 text-xs">lbs</div>
+                    <div class="text-gray-500 text-xs" id="sum-weight-unit">lbs</div>
                 </div>
             </div>
         </div>
@@ -287,8 +287,10 @@
                     <div class="flex gap-2">
                         <button onclick="setWeightMode('lbs_oz')" id="wt-mode-lbs_oz"
                             class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all wt-toggle-active">lbs + oz</button>
-                        <button onclick="setWeightMode('decimal')" id="wt-mode-decimal"
-                            class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all wt-toggle-inactive">Decimal lbs</button>
+                        <button onclick="setWeightMode('lbs')" id="wt-mode-lbs"
+                            class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all wt-toggle-inactive">lbs</button>
+                        <button onclick="setWeightMode('kg')" id="wt-mode-kg"
+                            class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all wt-toggle-inactive">kg</button>
                     </div>
                 </div>
                 <div id="weight-lbs-oz-input" class="flex gap-4">
@@ -307,6 +309,11 @@
                 <div id="weight-decimal-input" class="hidden">
                     <label class="block text-xs font-medium text-gray-500 mb-1">Weight (lbs)</label>
                     <input type="text" id="weight-decimal" value="7.00" inputmode="decimal" pattern="[0-9]*\.?[0-9]*"
+                        class="w-full text-center text-2xl font-bold border border-gray-200 rounded-lg py-2 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                </div>
+                <div id="weight-kg-input" class="hidden">
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Weight (kg)</label>
+                    <input type="text" id="weight-kg" value="3.00" inputmode="decimal" pattern="[0-9]*\.?[0-9]*"
                         class="w-full text-center text-2xl font-bold border border-gray-200 rounded-lg py-2 focus:outline-none focus:ring-2 focus:ring-brand-400">
                 </div>
                 <button onclick="submitWeight()" id="btn-weight"
@@ -518,12 +525,16 @@
         }
 
         function setWeightMode(mode) {
+            // Migrate old 'decimal' mode to 'lbs'
+            if (mode === 'decimal') mode = 'lbs';
             weightMode = mode;
             localStorage.setItem('olive_weight_mode', mode);
             document.getElementById('weight-lbs-oz-input').classList.toggle('hidden', mode !== 'lbs_oz');
-            document.getElementById('weight-decimal-input').classList.toggle('hidden', mode !== 'decimal');
-            document.getElementById('wt-mode-lbs_oz').className = `flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${mode === 'lbs_oz' ? 'wt-toggle-active' : 'wt-toggle-inactive'}`;
-            document.getElementById('wt-mode-decimal').className = `flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${mode === 'decimal' ? 'wt-toggle-active' : 'wt-toggle-inactive'}`;
+            document.getElementById('weight-decimal-input').classList.toggle('hidden', mode !== 'lbs');
+            document.getElementById('weight-kg-input').classList.toggle('hidden', mode !== 'kg');
+            ['lbs_oz', 'lbs', 'kg'].forEach(m => {
+                document.getElementById('wt-mode-' + m).className = `flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${mode === m ? 'wt-toggle-active' : 'wt-toggle-inactive'}`;
+            });
         }
 
         // ============ SUBMIT HANDLERS ============
@@ -567,19 +578,28 @@
         function submitWeight() {
             const dt = document.getElementById('weight-dt').value;
             if (!dt) { showToast('Set date and time', 'error'); return; }
-            let pounds, ounces, total_lbs;
-            if (weightMode === 'decimal') {
+            let pounds, ounces, total_lbs, kg;
+            if (weightMode === 'kg') {
+                kg = parseFloat(document.getElementById('weight-kg').value);
+                if (isNaN(kg)) { showToast('Enter a weight', 'error'); return; }
+                kg = Math.round(kg * 100) / 100;
+                total_lbs = Math.round(kg * 2.20462 * 100) / 100;
+                pounds = Math.floor(total_lbs);
+                ounces = Math.round((total_lbs - pounds) * 16 * 10) / 10;
+            } else if (weightMode === 'lbs') {
                 total_lbs = parseFloat(document.getElementById('weight-decimal').value);
                 if (isNaN(total_lbs)) { showToast('Enter a weight', 'error'); return; }
                 total_lbs = Math.round(total_lbs * 100) / 100;
                 pounds = Math.floor(total_lbs);
                 ounces = Math.round((total_lbs - pounds) * 16 * 10) / 10;
+                kg = Math.round(total_lbs / 2.20462 * 100) / 100;
             } else {
                 pounds = parseInt(document.getElementById('weight-lbs').value) || 0;
                 ounces = parseFloat(document.getElementById('weight-ozs').value) || 0;
                 total_lbs = Math.round((pounds + ounces / 16) * 100) / 100;
+                kg = Math.round(total_lbs / 2.20462 * 100) / 100;
             }
-            addEntry(KEYS.weights, { dt, pounds, ounces, total_lbs, input_mode: weightMode });
+            addEntry(KEYS.weights, { dt, pounds, ounces, total_lbs, kg, input_mode: weightMode });
             showToast('Weight logged!', 'success');
             setNow('weight-dt');
             renderList('weight');
@@ -650,7 +670,15 @@
             document.getElementById('sum-oz').textContent = Math.round(feedings.reduce((s, e) => s + (e.amount_oz || 0), 0) * 10) / 10;
             document.getElementById('sum-poops').textContent = poops.length;
             document.getElementById('sum-sleep').textContent = Math.round(sleeps.reduce((s, e) => s + (e.duration_hrs || 0), 0) * 10) / 10;
-            document.getElementById('sum-weight').textContent = weights.length > 0 ? weights[0].total_lbs : '--';
+            if (weights.length > 0) {
+                const latest = weights[0];
+                const isKg = latest.input_mode === 'kg';
+                document.getElementById('sum-weight').textContent = isKg ? latest.kg : latest.total_lbs;
+                document.getElementById('sum-weight-unit').textContent = isKg ? 'kg' : 'lbs';
+            } else {
+                document.getElementById('sum-weight').textContent = '--';
+                document.getElementById('sum-weight-unit').textContent = 'lbs';
+            }
         }
 
         // ============ RENDER LISTS ============
@@ -720,7 +748,7 @@
                         <div class="flex-1 min-w-0">
                             <span class="text-xs text-gray-400">${fmtDate(r.dt)} ${fmtTime(r.dt)}</span>
                         </div>
-                        <span class="text-lg font-bold text-brand-600 mr-1">${r.pounds} lbs ${r.ounces} oz</span>
+                        <span class="text-lg font-bold text-brand-600 mr-1">${r.input_mode === 'kg' ? r.kg + ' kg' : r.pounds + ' lbs ' + r.ounces + ' oz'}</span>
                         ${actionBtns('weights', r.id)}
                     </div>`).join('');
             }
@@ -754,9 +782,14 @@
                           { key: 'end', label: 'End', type: 'datetime-local', value: entry.end },
                           { key: 'notes', label: 'Notes', type: 'text', value: entry.notes || '' }];
             } else {
-                fields = [{ key: 'dt', label: 'Date/Time', type: 'datetime-local', value: entry.dt },
-                          { key: 'pounds', label: 'Pounds', type: 'text', value: entry.pounds },
-                          { key: 'ounces', label: 'Ounces', type: 'text', value: entry.ounces }];
+                if (entry.input_mode === 'kg') {
+                    fields = [{ key: 'dt', label: 'Date/Time', type: 'datetime-local', value: entry.dt },
+                              { key: 'kg', label: 'Kilograms', type: 'text', value: entry.kg }];
+                } else {
+                    fields = [{ key: 'dt', label: 'Date/Time', type: 'datetime-local', value: entry.dt },
+                              { key: 'pounds', label: 'Pounds', type: 'text', value: entry.pounds },
+                              { key: 'ounces', label: 'Ounces', type: 'text', value: entry.ounces }];
+                }
             }
 
             const html = fields.map(f =>
@@ -790,13 +823,18 @@
             const updates = {};
             inputs.forEach(i => {
                 let v = i.value;
-                if (i.dataset.key === 'amount_oz' || i.dataset.key === 'ounces' || i.dataset.key === 'duration_hrs') v = parseFloat(v);
+                if (i.dataset.key === 'amount_oz' || i.dataset.key === 'ounces' || i.dataset.key === 'duration_hrs' || i.dataset.key === 'kg') v = parseFloat(v);
                 if (i.dataset.key === 'pounds') v = parseInt(v);
                 updates[i.dataset.key] = v;
             });
-            // Recompute total_lbs for weight edits
-            if (type === 'weights' && updates.pounds !== undefined) {
+            // Recompute totals for weight edits
+            if (type === 'weights' && updates.kg !== undefined) {
+                updates.total_lbs = Math.round(updates.kg * 2.20462 * 100) / 100;
+                updates.pounds = Math.floor(updates.total_lbs);
+                updates.ounces = Math.round((updates.total_lbs - updates.pounds) * 16 * 10) / 10;
+            } else if (type === 'weights' && updates.pounds !== undefined) {
                 updates.total_lbs = Math.round((updates.pounds + (updates.ounces || 0) / 16) * 100) / 100;
+                updates.kg = Math.round(updates.total_lbs / 2.20462 * 100) / 100;
             }
             // Recompute duration for sleep edits
             if (type === 'sleeps' && updates.start && updates.end) {
@@ -831,7 +869,7 @@
                 { name: 'feedings', headers: ['id','date','time','milk_type','amount_oz'], rows: load(KEYS.feedings).map(r => [r.id, fmtDate(r.dt), fmtTime(r.dt), r.milk_type, r.amount_oz]) },
                 { name: 'poops', headers: ['id','date','time','poop_type','notes'], rows: load(KEYS.poops).map(r => [r.id, fmtDate(r.dt), fmtTime(r.dt), r.poop_type, r.notes || '']) },
                 { name: 'sleeps', headers: ['id','start_date','start_time','end_date','end_time','duration_hrs','notes'], rows: load(KEYS.sleeps).map(r => [r.id, fmtDate(r.start), fmtTime(r.start), fmtDate(r.end), fmtTime(r.end), r.duration_hrs, r.notes || '']) },
-                { name: 'weights', headers: ['id','date','time','pounds','ounces','total_lbs','input_mode'], rows: load(KEYS.weights).map(r => [r.id, fmtDate(r.dt), fmtTime(r.dt), r.pounds, r.ounces, r.total_lbs, r.input_mode || 'lbs_oz']) },
+                { name: 'weights', headers: ['id','date','time','pounds','ounces','total_lbs','kg','input_mode'], rows: load(KEYS.weights).map(r => [r.id, fmtDate(r.dt), fmtTime(r.dt), r.pounds, r.ounces, r.total_lbs, r.kg || '', r.input_mode || 'lbs_oz']) },
             ];
 
             let csv = `# Olive Export - ${babyName} - ${todayStr()}\n`;
@@ -889,6 +927,7 @@
                         if (obj.pounds) obj.pounds = parseInt(obj.pounds);
                         if (obj.ounces) obj.ounces = parseFloat(obj.ounces);
                         if (obj.total_lbs) obj.total_lbs = parseFloat(obj.total_lbs);
+                        if (obj.kg) obj.kg = parseFloat(obj.kg);
                         if (obj.duration_hrs) obj.duration_hrs = parseFloat(obj.duration_hrs);
                         if (!obj.id) obj.id = uid();
                         parsed[currentSection].push(obj);
