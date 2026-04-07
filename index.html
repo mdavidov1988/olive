@@ -28,7 +28,7 @@
         * { -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .tab-active { background: white; color: #16A34A; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .tab-inactive { background: transparent; color: rgba(255,255,255,0.7); }
+        .tab-inactive { background: transparent; color: #1f2937; }
         .pill-selected { background: #16A34A; color: white; }
         .pill-unselected { background: #DCFCE7; color: #15803D; }
         .toast { animation: slideUp 0.3s ease-out, fadeOut 0.3s ease-in 2s forwards; }
@@ -69,7 +69,13 @@
                     <span class="text-xl">🫒</span>
                     <h1 class="text-2xl font-bold tracking-tight">Olive</h1>
                 </div>
-                <span id="baby-name-display" class="text-sm font-medium opacity-80"></span>
+                <div class="flex items-center gap-3">
+                    <span id="baby-name-display" class="text-sm font-medium opacity-80"></span>
+                    <button onclick="toggleSettings()" id="btn-gear"
+                        class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition-all">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
             </div>
         </header>
 
@@ -117,10 +123,6 @@
                 <button onclick="switchTab('weight')" id="tab-weight"
                     class="flex-1 py-3 rounded-lg font-semibold transition-all tab-inactive flex flex-col items-center gap-0.5">
                     <span class="text-2xl leading-none">⚖️</span><span class="text-xs">Weight</span>
-                </button>
-                <button onclick="switchTab('settings')" id="tab-settings"
-                    class="flex-1 py-3 rounded-lg font-semibold transition-all tab-inactive flex flex-col items-center gap-0.5">
-                    <span class="text-2xl leading-none">⚙️</span><span class="text-xs">More</span>
                 </button>
             </div>
         </div>
@@ -337,20 +339,20 @@
 
                 <div>
                     <label class="block text-xs font-medium text-gray-500 mb-2">Export Data</label>
-                    <p class="text-xs text-gray-400 mb-2">Download all your data as a JSON file</p>
-                    <button onclick="exportData()"
+                    <p class="text-xs text-gray-400 mb-2">Download all your data as CSV files</p>
+                    <button onclick="exportCSV()"
                         class="w-full py-2.5 border border-brand-200 text-brand-700 rounded-xl font-semibold text-sm hover:bg-brand-50 active:scale-[0.98] transition-all">
-                        Export All Data
+                        Export All Data (CSV)
                     </button>
                 </div>
 
                 <div>
                     <label class="block text-xs font-medium text-gray-500 mb-2">Import Data</label>
-                    <p class="text-xs text-gray-400 mb-2">Restore from a previously exported JSON file</p>
-                    <input type="file" id="import-file" accept=".json" onchange="importData(event)" class="hidden">
+                    <p class="text-xs text-gray-400 mb-2">Restore from a previously exported CSV file</p>
+                    <input type="file" id="import-file" accept=".csv" onchange="importCSV(event)" class="hidden">
                     <button onclick="document.getElementById('import-file').click()"
                         class="w-full py-2.5 border border-brand-200 text-brand-700 rounded-xl font-semibold text-sm hover:bg-brand-50 active:scale-[0.98] transition-all">
-                        Import Data
+                        Import Data (CSV)
                     </button>
                 </div>
 
@@ -392,7 +394,8 @@
         let selectedPoopType = 'Normal';
         let currentTab = 'feed';
         let weightMode = localStorage.getItem('olive_weight_mode') || 'lbs_oz';
-        const allTabs = ['feed', 'poop', 'sleep', 'weight', 'settings'];
+        const allTabs = ['feed', 'poop', 'sleep', 'weight'];
+        let settingsOpen = false;
         let sleepTimerInterval = null;
         let sleepStartTime = null;
 
@@ -463,6 +466,8 @@
         // ============ TABS ============
         function switchTab(tab) {
             currentTab = tab;
+            settingsOpen = false;
+            document.getElementById('panel-settings').classList.add('hidden');
             allTabs.forEach(t => {
                 const panel = document.getElementById(`panel-${t}`);
                 if (panel) panel.classList.toggle('hidden', t !== tab);
@@ -470,9 +475,22 @@
                 if (btn) btn.className = `flex-1 py-3 rounded-lg font-semibold transition-all flex flex-col items-center gap-0.5 ${t === tab ? 'tab-active' : 'tab-inactive'}`;
             });
             if (tab === 'sleep') { setSleepDefaults(); }
-            else if (tab === 'settings') { document.getElementById('settings-baby-name').value = localStorage.getItem(KEYS.name) || ''; }
             else { const dtId = tab === 'feed' ? 'feed-dt' : tab === 'poop' ? 'poop-dt' : 'weight-dt'; setNow(dtId); }
-            if (['feed', 'poop', 'sleep', 'weight'].includes(tab)) renderList(tab);
+            renderList(tab);
+        }
+
+        function toggleSettings() {
+            settingsOpen = !settingsOpen;
+            if (settingsOpen) {
+                allTabs.forEach(t => {
+                    document.getElementById(`panel-${t}`).classList.add('hidden');
+                });
+                document.getElementById('panel-settings').classList.remove('hidden');
+                document.getElementById('settings-baby-name').value = localStorage.getItem(KEYS.name) || '';
+            } else {
+                document.getElementById('panel-settings').classList.add('hidden');
+                document.getElementById(`panel-${currentTab}`).classList.remove('hidden');
+            }
         }
 
         // ============ MILK / POOP / OZ SELECTORS ============
@@ -802,44 +820,115 @@
             showToast('Name saved', 'success');
         }
 
-        function exportData() {
-            const data = {
-                baby_name: localStorage.getItem(KEYS.name),
-                feedings: load(KEYS.feedings),
-                poops: load(KEYS.poops),
-                sleeps: load(KEYS.sleeps),
-                weights: load(KEYS.weights),
-                exported_at: new Date().toISOString(),
-            };
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        function csvEscape(val) {
+            const s = String(val == null ? '' : val);
+            return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
+        }
+
+        function exportCSV() {
+            const babyName = localStorage.getItem(KEYS.name) || 'data';
+            const sections = [
+                { name: 'feedings', headers: ['id','date','time','milk_type','amount_oz'], rows: load(KEYS.feedings).map(r => [r.id, fmtDate(r.dt), fmtTime(r.dt), r.milk_type, r.amount_oz]) },
+                { name: 'poops', headers: ['id','date','time','poop_type','notes'], rows: load(KEYS.poops).map(r => [r.id, fmtDate(r.dt), fmtTime(r.dt), r.poop_type, r.notes || '']) },
+                { name: 'sleeps', headers: ['id','start_date','start_time','end_date','end_time','duration_hrs','notes'], rows: load(KEYS.sleeps).map(r => [r.id, fmtDate(r.start), fmtTime(r.start), fmtDate(r.end), fmtTime(r.end), r.duration_hrs, r.notes || '']) },
+                { name: 'weights', headers: ['id','date','time','pounds','ounces','total_lbs','input_mode'], rows: load(KEYS.weights).map(r => [r.id, fmtDate(r.dt), fmtTime(r.dt), r.pounds, r.ounces, r.total_lbs, r.input_mode || 'lbs_oz']) },
+            ];
+
+            let csv = `# Olive Export - ${babyName} - ${todayStr()}\n`;
+            for (const sec of sections) {
+                csv += `\n[${sec.name}]\n`;
+                csv += sec.headers.map(csvEscape).join(',') + '\n';
+                for (const row of sec.rows) csv += row.map(csvEscape).join(',') + '\n';
+            }
+
+            const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `olive-${data.baby_name || 'data'}-${todayStr()}.json`;
+            a.download = `olive-${babyName}-${todayStr()}.csv`;
             a.click();
             URL.revokeObjectURL(a.href);
             showToast('Data exported', 'success');
         }
 
-        function importData(event) {
+        function importCSV(event) {
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
-                    const data = JSON.parse(e.target.result);
-                    if (!confirm(`Import data for "${data.baby_name || 'unknown'}"? This will replace all current data.`)) return;
-                    if (data.baby_name) localStorage.setItem(KEYS.name, data.baby_name);
-                    if (data.feedings) save(KEYS.feedings, data.feedings);
-                    if (data.poops) save(KEYS.poops, data.poops);
-                    if (data.sleeps) save(KEYS.sleeps, data.sleeps);
-                    if (data.weights) save(KEYS.weights, data.weights);
+                    const text = e.target.result;
+                    if (!confirm('Import this file? This will replace all current data.')) return;
+
+                    // Extract baby name from header comment
+                    const headerMatch = text.match(/^# Olive Export - (.+?) - /m);
+                    if (headerMatch) localStorage.setItem(KEYS.name, headerMatch[1]);
+
+                    // Parse sections
+                    const sectionMap = { feedings: KEYS.feedings, poops: KEYS.poops, sleeps: KEYS.sleeps, weights: KEYS.weights };
+                    let currentSection = null, headers = null;
+                    const parsed = { feedings: [], poops: [], sleeps: [], weights: [] };
+
+                    for (const line of text.split('\n')) {
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed.startsWith('#')) continue;
+                        const secMatch = trimmed.match(/^\[(\w+)\]$/);
+                        if (secMatch) { currentSection = secMatch[1]; headers = null; continue; }
+                        if (!currentSection || !parsed[currentSection]) continue;
+
+                        const vals = parseCSVLine(trimmed);
+                        if (!headers) { headers = vals; continue; }
+
+                        const obj = {};
+                        headers.forEach((h, i) => obj[h] = vals[i] || '');
+                        // Reconstruct datetime fields from date+time
+                        if (obj.date && obj.time) obj.dt = parseDateTimeCSV(obj.date, obj.time);
+                        if (obj.start_date && obj.start_time) obj.start = parseDateTimeCSV(obj.start_date, obj.start_time);
+                        if (obj.end_date && obj.end_time) obj.end = parseDateTimeCSV(obj.end_date, obj.end_time);
+                        // Coerce numbers
+                        if (obj.amount_oz) obj.amount_oz = parseFloat(obj.amount_oz);
+                        if (obj.pounds) obj.pounds = parseInt(obj.pounds);
+                        if (obj.ounces) obj.ounces = parseFloat(obj.ounces);
+                        if (obj.total_lbs) obj.total_lbs = parseFloat(obj.total_lbs);
+                        if (obj.duration_hrs) obj.duration_hrs = parseFloat(obj.duration_hrs);
+                        if (!obj.id) obj.id = uid();
+                        parsed[currentSection].push(obj);
+                    }
+
+                    for (const [sec, key] of Object.entries(sectionMap)) save(key, parsed[sec]);
                     showToast('Data imported!', 'success');
                     initApp();
                     switchTab('feed');
-                } catch { showToast('Invalid file', 'error'); }
+                } catch (err) { showToast('Invalid CSV file', 'error'); }
             };
             reader.readAsText(file);
             event.target.value = '';
+        }
+
+        function parseCSVLine(line) {
+            const result = []; let current = '', inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const ch = line[i];
+                if (inQuotes) {
+                    if (ch === '"' && line[i+1] === '"') { current += '"'; i++; }
+                    else if (ch === '"') inQuotes = false;
+                    else current += ch;
+                } else {
+                    if (ch === '"') inQuotes = true;
+                    else if (ch === ',') { result.push(current); current = ''; }
+                    else current += ch;
+                }
+            }
+            result.push(current);
+            return result;
+        }
+
+        function parseDateTimeCSV(dateStr, timeStr) {
+            const [month, day, year] = dateStr.split('/');
+            const [timePart, ampm] = timeStr.split(' ');
+            let [hours, minutes] = timePart.split(':').map(Number);
+            if (ampm && ampm.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+            if (ampm && ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+            return `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}T${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}`;
         }
 
         function clearAllData() {
