@@ -1,9 +1,0 @@
-{
-    "name": "Olive",
-    "short_name": "Olive",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#F0FDF4",
-    "theme_color": "#16A34A",
-    "scope": "/"
-}
